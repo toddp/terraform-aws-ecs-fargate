@@ -3,8 +3,11 @@
 # ----------------------------------------
 
 provider "aws" {
-  region = "eu-west-1"
+  access_key = "${var.access_key}"
+  secret_key = "${var.secret_key}"
+  region     = "${var.region}"
 }
+
 
 resource "aws_ecs_cluster" "cluster" {
   name = "example-ecs-cluster"
@@ -49,8 +52,8 @@ resource "aws_security_group_rule" "task_ingress_8000" {
   security_group_id        = "${module.fargate.service_sg_id}"
   type                     = "ingress"
   protocol                 = "tcp"
-  from_port                = "8000"
-  to_port                  = "8000"
+  from_port                = "8089"
+  to_port                  = "8089"
   source_security_group_id = "${module.fargate_alb.security_group_id}"
 }
 
@@ -71,13 +74,14 @@ module "fargate" {
   vpc_id               = "${data.aws_vpc.main.id}"
   private_subnet_ids   = "${data.aws_subnet_ids.main.ids}"
   cluster_id           = "${aws_ecs_cluster.cluster.id}"
-  task_container_image = "crccheck/hello-world:latest"
+  #task_container_image = "crccheck/hello-world:latest"
+  task_container_image = "pinkatron/locust:latest"
 
   // public ip is needed for default vpc, default is false
   task_container_assign_public_ip = "true"
 
   // port, default protocol is HTTP
-  task_container_port = "8000"
+  task_container_port = "8089"
 
   health_check {
     port = "traffic-port"
@@ -88,6 +92,6 @@ module "fargate" {
     environment = "test"
     terraform   = "true"
   }
-
+  desired_count = 1
   lb_arn = "${module.fargate_alb.arn}"
 }
