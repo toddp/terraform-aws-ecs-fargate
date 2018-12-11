@@ -92,6 +92,6 @@ module "fargate" {
     environment = "test"
     terraform   = "true"
   }
-  desired_count = 1
+  desired_count = 2
   lb_arn = "${module.fargate_alb.arn}"
 }

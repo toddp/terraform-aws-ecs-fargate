@@ -124,6 +124,27 @@ resource "aws_ecs_task_definition" "task" {
     },
     "command": ${jsonencode(var.task_container_command)},
     "environment": ${jsonencode(data.null_data_source.task_environment.*.outputs)}
+},{
+    "name": "test",
+    "image": "pinkatron/hello-world",
+    "essential": true,
+    "portMappings": [
+        {
+            "containerPort": 8000,
+            "hostPort": 8000,
+            "protocol":"tcp"
+        }
+    ],
+    "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+            "awslogs-group": "${aws_cloudwatch_log_group.main.name}",
+            "awslogs-region": "${data.aws_region.current.name}",
+            "awslogs-stream-prefix": "container"
+        }
+    },
+    "command": ${jsonencode(var.task_container_command)},
+    "environment": ${jsonencode(data.null_data_source.task_environment.*.outputs)}
 }]
 EOF
 }
