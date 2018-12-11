@@ -81,6 +81,50 @@ resource "aws_lb_target_group" "task" {
   tags = "${merge(var.tags, map("Name", "${var.name_prefix}-target-${var.task_container_port}"))}"
 }
 
+
+# ------------------------------------------------------------------------------
+# LB Target group -- slave
+# ------------------------------------------------------------------------------
+resource "aws_lb_target_group" "task_slave" {
+  vpc_id       = "${var.vpc_id}"
+  protocol     = "${var.task_container_protocol}"
+  port         = "${var.task_container_port_slave}"
+  target_type  = "ip"
+  health_check = ["${var.health_check}"]
+
+  # NOTE: TF is unable to destroy a target group while a listener is attached,
+  # therefor we have to create a new one before destroying the old. This also means
+  # we have to let it have a random name, and then tag it with the desired name.
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = "${merge(var.tags, map("Name", "${var.name_prefix}-slave-target-${var.task_container_port_slave}"))}"
+}
+
+
+
+
+# ------------------------------------------------------------------------------
+# LB Target group -- slave2
+# ------------------------------------------------------------------------------
+resource "aws_lb_target_group" "task_slave2" {
+  vpc_id       = "${var.vpc_id}"
+  protocol     = "${var.task_container_protocol}"
+  port         = "${var.task_container_port_slave2}"
+  target_type  = "ip"
+  health_check = ["${var.health_check}"]
+
+  # NOTE: TF is unable to destroy a target group while a listener is attached,
+  # therefor we have to create a new one before destroying the old. This also means
+  # we have to let it have a random name, and then tag it with the desired name.
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = "${merge(var.tags, map("Name", "${var.name_prefix}-slave-target-${var.task_container_port_slave2}"))}"
+}
+
 # ------------------------------------------------------------------------------
 # ECS Task/Service
 # ------------------------------------------------------------------------------
@@ -112,7 +156,18 @@ resource "aws_ecs_task_definition" "task" {
             "containerPort": ${var.task_container_port},
             "hostPort": ${var.task_container_port},
             "protocol":"tcp"
+        },
+        {
+            "containerPort": 5567,
+            "hostPort": 5567,
+            "protocol":"tcp"
+        },
+        {
+            "containerPort": 5568,
+            "hostPort": 5568,
+            "protocol":"tcp"
         }
+
     ],
     "logConfiguration": {
         "logDriver": "awslogs",
@@ -145,7 +200,51 @@ resource "aws_ecs_task_definition" "task" {
     },
     "command": ${jsonencode(var.task_container_command)},
     "environment": ${jsonencode(data.null_data_source.task_environment.*.outputs)}
-}]
+},
+
+
+{
+    "name": "${var.name_prefix}-slave",
+    "image": "pinkatron/locust:latest",
+    "essential": true,
+    "portMappings": [
+        {
+            "containerPort": 5557,
+            "hostPort": 5557,
+            "protocol":"tcp"
+        },
+        {
+            "containerPort": 5558,
+            "hostPort": 5558,
+            "protocol":"tcp"
+        }
+
+    ],
+    "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+            "awslogs-group": "${aws_cloudwatch_log_group.main.name}",
+            "awslogs-region": "${data.aws_region.current.name}",
+            "awslogs-stream-prefix": "container"
+        }
+    },
+    "command": ${jsonencode(var.task_container_command_slave)},
+    "environment": ${jsonencode(data.null_data_source.task_environment.*.outputs)}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+]
 EOF
 }
 

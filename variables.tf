@@ -39,6 +39,18 @@ variable "task_container_assign_public_ip" {
 variable "task_container_port" {
   description = "Port that the container exposes."
 }
+variable "task_container_port_slave" {
+  description = "Port that the container exposes."
+}
+variable "task_container_port_slave2" {
+  description = "Port that the container exposes."
+}
+variable "task_container_port_slave3" {
+  description = "Port that the container exposes."
+}
+variable "task_container_port_slave4" {
+  description = "Port that the container exposes."
+}
 
 variable "task_container_protocol" {
   description = "Protocol that the container exposes."
@@ -56,6 +68,10 @@ variable "task_definition_memory" {
 }
 
 variable "task_container_command" {
+  description = "The command that is passed to the container."
+  default     = []
+}
+variable "task_container_command_slave" {
   description = "The command that is passed to the container."
   default     = []
 }
