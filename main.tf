@@ -128,6 +128,41 @@ resource "aws_ecs_task_definition" "task" {
 EOF
 }
 
+resource "aws_ecs_task_definition" "task-slave" {
+  family                   = "taskslave"
+  execution_role_arn       = "${aws_iam_role.execution.arn}"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "${var.task_definition_cpu}"
+  memory                   = "${var.task_definition_memory}"
+  task_role_arn            = "${aws_iam_role.task.arn}"
+
+  container_definitions = <<EOF
+[{
+    "name": "taskslave",
+    "image": "pinkatron/hello-world:latest",
+    "essential": true,
+    "portMappings": [
+        {
+            "containerPort": 8000,
+            "hostPort": 8000,
+            "protocol":"tcp"
+        }
+    ],
+    "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+            "awslogs-group": "${aws_cloudwatch_log_group.main.name}",
+            "awslogs-region": "${data.aws_region.current.name}",
+            "awslogs-stream-prefix": "container"
+        }
+    },
+    "command": ${jsonencode(var.task_container_command)},
+    "environment": ${jsonencode(data.null_data_source.task_environment.*.outputs)}
+}]
+EOF
+}
+
 resource "aws_ecs_service" "service" {
   depends_on                         = ["null_resource.lb_exists"]
   name                               = "${var.name_prefix}"
@@ -152,6 +187,29 @@ resource "aws_ecs_service" "service" {
   }
 }
 
+resource "aws_ecs_service" "service-slave" {
+  depends_on                         = ["null_resource.lb_exists"]
+  name                               = "taskslave"
+  cluster                            = "${var.cluster_id}"
+  task_definition                    = "${aws_ecs_task_definition.task-slave.arn}"
+  desired_count                      = "${var.desired_count}"
+  launch_type                        = "FARGATE"
+  deployment_minimum_healthy_percent = 50
+  deployment_maximum_percent         = 200
+  health_check_grace_period_seconds  = "${var.health_check_grace_period_seconds}"
+
+  network_configuration {
+    subnets          = ["${var.private_subnet_ids}"]
+    security_groups  = ["${aws_security_group.ecs_service.id}"]
+    assign_public_ip = "${var.task_container_assign_public_ip}"
+  }
+
+  load_balancer {
+    container_name   = "taskslave"
+    container_port   = "8000"
+    target_group_arn = "${aws_lb_target_group.task.arn}"
+  }
+}
 # HACK: The workaround used in ecs/service does not work for some reason in this module, this fixes the following error:
 # "The target group with targetGroupArn arn:aws:elasticloadbalancing:... does not have an associated load balancer."
 # see https://github.com/hashicorp/terraform/issues/12634.
