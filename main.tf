@@ -158,57 +158,6 @@ resource "aws_ecs_task_definition" "task" {
             "protocol":"tcp"
         },
         {
-            "containerPort": 5567,
-            "hostPort": 5567,
-            "protocol":"tcp"
-        },
-        {
-            "containerPort": 5568,
-            "hostPort": 5568,
-            "protocol":"tcp"
-        }
-
-    ],
-    "logConfiguration": {
-        "logDriver": "awslogs",
-        "options": {
-            "awslogs-group": "${aws_cloudwatch_log_group.main.name}",
-            "awslogs-region": "${data.aws_region.current.name}",
-            "awslogs-stream-prefix": "container"
-        }
-    },
-    "command": ${jsonencode(var.task_container_command)},
-    "environment": ${jsonencode(data.null_data_source.task_environment.*.outputs)}
-},{
-    "name": "test",
-    "image": "pinkatron/hello-world",
-    "essential": true,
-    "portMappings": [
-        {
-            "containerPort": 8000,
-            "hostPort": 8000,
-            "protocol":"tcp"
-        }
-    ],
-    "logConfiguration": {
-        "logDriver": "awslogs",
-        "options": {
-            "awslogs-group": "${aws_cloudwatch_log_group.main.name}",
-            "awslogs-region": "${data.aws_region.current.name}",
-            "awslogs-stream-prefix": "container"
-        }
-    },
-    "command": ${jsonencode(var.task_container_command)},
-    "environment": ${jsonencode(data.null_data_source.task_environment.*.outputs)}
-},
-
-
-{
-    "name": "${var.name_prefix}-slave",
-    "image": "pinkatron/locust:latest",
-    "essential": true,
-    "portMappings": [
-        {
             "containerPort": 5557,
             "hostPort": 5557,
             "protocol":"tcp"
@@ -228,25 +177,54 @@ resource "aws_ecs_task_definition" "task" {
             "awslogs-stream-prefix": "container"
         }
     },
-    "command": ${jsonencode(var.task_container_command_slave)},
+    "command": ${jsonencode(var.task_container_command)},
     "environment": ${jsonencode(data.null_data_source.task_environment.*.outputs)}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 ]
 EOF
 }
+
+resource "aws_ecs_task_definition" "task-slave" {
+  family                   = "taskslave"
+  execution_role_arn       = "${aws_iam_role.execution.arn}"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "${var.task_definition_cpu}"
+  memory                   = "${var.task_definition_memory}"
+  task_role_arn            = "${aws_iam_role.task.arn}"
+
+  container_definitions = <<EOF
+[{
+    "name": "taskslave",
+    "image": "pinkatron/locust:latest",
+    "essential": true,
+    "portMappings": [
+        {
+            "containerPort": 5567,
+            "hostPort": 5567,
+            "protocol":"tcp"
+        },
+        {
+            "containerPort": 5568,
+            "hostPort": 5568,
+            "protocol":"tcp"
+        }
+
+    ],
+    "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+            "awslogs-group": "${aws_cloudwatch_log_group.main.name}",
+            "awslogs-region": "${data.aws_region.current.name}",
+            "awslogs-stream-prefix": "container"
+        }
+    },
+    "command": ${jsonencode(var.task_container_command_slave)},
+    "environment": ${jsonencode(data.null_data_source.task_environment.*.outputs)}
+}]
+EOF
+}
+
 
 resource "aws_ecs_service" "service" {
   depends_on                         = ["null_resource.lb_exists"]
@@ -268,6 +246,30 @@ resource "aws_ecs_service" "service" {
   load_balancer {
     container_name   = "${var.name_prefix}"
     container_port   = "${var.task_container_port}"
+    target_group_arn = "${aws_lb_target_group.task.arn}"
+  }
+}
+
+resource "aws_ecs_service" "service-slave" {
+  depends_on                         = ["null_resource.lb_exists"]
+  name                               = "taskslave"
+  cluster                            = "${var.cluster_id}"
+  task_definition                    = "${aws_ecs_task_definition.task-slave.arn}"
+  desired_count                      = "${var.desired_count}"
+  launch_type                        = "FARGATE"
+  deployment_minimum_healthy_percent = 50
+  deployment_maximum_percent         = 200
+  health_check_grace_period_seconds  = "${var.health_check_grace_period_seconds}"
+
+  network_configuration {
+    subnets          = ["${var.private_subnet_ids}"]
+    security_groups  = ["${aws_security_group.ecs_service.id}"]
+    assign_public_ip = "${var.task_container_assign_public_ip}"
+  }
+
+  load_balancer {
+    container_name   = "taskslave"
+    container_port   = "5567" #8000
     target_group_arn = "${aws_lb_target_group.task.arn}"
   }
 }

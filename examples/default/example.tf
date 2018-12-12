@@ -200,9 +200,9 @@ module "fargate" {
     environment = "test"
     terraform   = "true"
   }
-  desired_count = 2
+  desired_count = 1
   lb_arn = "${module.fargate_alb.arn}"
-  task_container_command  = ["--master-bind-port", "5567"]
-  task_container_command_slave = ["--master-host", "http://example-ecs-cluster-alb-398518833.us-west-2.elb.amazonaws.com", "--master-port", "5567"]
+  task_container_command  = ["--master-bind-port", "5557"]
+  task_container_command_slave = ["--master-host", "ip-172-31-4-21.ec2.internal"]
 
 }
