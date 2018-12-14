@@ -179,7 +179,8 @@ module "fargate" {
   private_subnet_ids   = "${data.aws_subnet_ids.main.ids}"
   cluster_id           = "${aws_ecs_cluster.cluster.id}"
   #task_container_image = "crccheck/hello-world:latest"
-  task_container_image = "pinkatron/locust:latest"
+  #task_container_image = "pinkatron/locust:latest"
+  task_container_image = "kkumar30/locust:latest"
 
   // public ip is needed for default vpc, default is false
   task_container_assign_public_ip = "true"
@@ -202,7 +203,7 @@ module "fargate" {
   }
   desired_count = 1
   lb_arn = "${module.fargate_alb.arn}"
-  task_container_command  = ["--master-bind-port", "5557"]
-  task_container_command_slave = ["--master-host", "ip-172-31-4-21.ec2.internal"]
+  task_container_command  = ["--target", "http://example.com"]
+  task_container_command_slave = ["--master-host", "172.31.19.24"]
 
 }

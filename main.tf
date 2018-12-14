@@ -99,7 +99,7 @@ resource "aws_lb_target_group" "task_slave" {
     create_before_destroy = true
   }
 
-  tags = "${merge(var.tags, map("Name", "${var.name_prefix}-slave-target-${var.task_container_port_slave}"))}"
+  tags = "${merge(var.tags, map("Name", "taskslave-slave-target-${var.task_container_port_slave}"))}"
 }
 
 
@@ -196,12 +196,12 @@ resource "aws_ecs_task_definition" "task-slave" {
   container_definitions = <<EOF
 [{
     "name": "taskslave",
-    "image": "pinkatron/locust:latest",
+    "image": "kkumar30/locust:latest",
     "essential": true,
     "portMappings": [
         {
-            "containerPort": 5567,
-            "hostPort": 5567,
+            "containerPort": 5557,
+            "hostPort": 5557,
             "protocol":"tcp"
         },
         {
@@ -251,7 +251,7 @@ resource "aws_ecs_service" "service" {
 }
 
 resource "aws_ecs_service" "service-slave" {
-  depends_on                         = ["null_resource.lb_exists"]
+  depends_on                         = ["null_resource.lb_exists_slave"]
   name                               = "taskslave"
   cluster                            = "${var.cluster_id}"
   task_definition                    = "${aws_ecs_task_definition.task-slave.arn}"
@@ -259,7 +259,7 @@ resource "aws_ecs_service" "service-slave" {
   launch_type                        = "FARGATE"
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
-  health_check_grace_period_seconds  = "${var.health_check_grace_period_seconds}"
+//  health_check_grace_period_seconds  = "${var.health_check_grace_period_seconds}"
 
   network_configuration {
     subnets          = ["${var.private_subnet_ids}"]
@@ -267,11 +267,6 @@ resource "aws_ecs_service" "service-slave" {
     assign_public_ip = "${var.task_container_assign_public_ip}"
   }
 
-  load_balancer {
-    container_name   = "taskslave"
-    container_port   = "5567" #8000
-    target_group_arn = "${aws_lb_target_group.task.arn}"
-  }
 }
 
 # HACK: The workaround used in ecs/service does not work for some reason in this module, this fixes the following error:
@@ -279,6 +274,12 @@ resource "aws_ecs_service" "service-slave" {
 # see https://github.com/hashicorp/terraform/issues/12634.
 # Service depends on this resources which prevents it from being created until the LB is ready
 resource "null_resource" "lb_exists" {
+  triggers {
+    alb_name = "${var.lb_arn}"
+  }
+}
+
+resource "null_resource" "lb_exists_slave" {
   triggers {
     alb_name = "${var.lb_arn}"
   }
